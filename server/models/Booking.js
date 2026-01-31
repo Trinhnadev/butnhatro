@@ -29,9 +29,8 @@ const bookingSchema = new mongoose.Schema(
             trim: true,
         },
         peopleCount: {
-            type: Number,
+            type: String,
             required: [true, 'Number of people is required'],
-            min: 1,
         },
         budgetMax: {
             type: Number,
@@ -43,6 +42,7 @@ const bookingSchema = new mongoose.Schema(
         },
         viewTime: {
             type: Date,
+            required: [true, 'Viewing time is required'],
         },
         moveInDate: {
             type: Date,
@@ -71,14 +71,14 @@ bookingSchema.index({ phone: 1 });
 bookingSchema.index({ bookingCode: 1 });
 
 // Generate booking code before saving
-bookingSchema.pre('save', async function (next) {
+// Generate booking code before saving
+bookingSchema.pre('save', async function () {
     if (!this.bookingCode) {
         const date = new Date();
         const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
         const count = await mongoose.model('Booking').countDocuments();
         this.bookingCode = `BK${dateStr}${String(count + 1).padStart(4, '0')}`;
     }
-    next();
 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

@@ -129,11 +129,33 @@ const RoomDetail = () => {
                                     <div className="mb-6">
                                         <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Nội thất có sẵn</h4>
                                         <div className="flex flex-wrap gap-2">
-                                            {room.furnitures.map((item, index) => (
-                                                <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-800">
-                                                    🪑 {item}
-                                                </span>
-                                            ))}
+                                            {room.furnitures.map((item, index) => {
+                                                const iconMap = {
+                                                    'máy lạnh': '❄️',
+                                                    'tủ lạnh': '🧊',
+                                                    'máy giặt': '🧺',
+                                                    'giường': '🛏️',
+                                                    'tủ quần áo': '🚪',
+                                                    'kệ bếp': '🍳',
+                                                    'bàn ghế': '🪑',
+                                                    'nệm': '🛌',
+                                                    'sofa': '🛋️',
+                                                    'wifi': '📶',
+                                                    'tivi': '📺',
+                                                    'nóng lạnh': '🚿',
+                                                };
+                                                // Try exact match or strict includes for better matching
+                                                const lowerItem = item.toLowerCase();
+                                                const icon = iconMap[lowerItem] ||
+                                                    Object.entries(iconMap).find(([key]) => lowerItem.includes(key))?.[1] ||
+                                                    '✨'; // Default sparkle instead of chair if unknown
+
+                                                return (
+                                                    <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-800">
+                                                        <span className="mr-1.5">{icon}</span> {item}
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}

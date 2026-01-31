@@ -5,10 +5,14 @@ import Footer from './components/layout/Footer';
 import Home from './pages/public/Home';
 import RoomDetail from './pages/public/RoomDetail';
 import BookingPage from './pages/public/BookingPage';
+import BookingSearch from './pages/public/BookingSearch';
+import BookingList from './pages/public/BookingList';
 import Register from './pages/public/Register';
 import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
+import BookingDetail from './pages/admin/BookingDetail';
 import Loading from './components/common/Loading';
+import ScrollToTop from './components/common/ScrollToTop';
 
 // Protected route wrapper
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -32,6 +36,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 function AppContent() {
     return (
         <Router>
+            <ScrollToTop />
             <div className="flex flex-col min-h-screen">
                 <Header />
                 <main className="flex-grow">
@@ -40,6 +45,8 @@ function AppContent() {
                         <Route path="/" element={<Home />} />
                         <Route path="/rooms/:id" element={<RoomDetail />} />
                         <Route path="/booking/:roomId" element={<BookingPage />} />
+                        <Route path="/booking-search" element={<BookingSearch />} />
+                        <Route path="/booking-list" element={<BookingList />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
 
@@ -49,6 +56,14 @@ function AppContent() {
                             element={
                                 <ProtectedRoute adminOnly>
                                     <Dashboard />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/admin/bookings/:id"
+                            element={
+                                <ProtectedRoute adminOnly>
+                                    <BookingDetail />
                                 </ProtectedRoute>
                             }
                         />

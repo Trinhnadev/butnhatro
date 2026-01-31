@@ -1,6 +1,7 @@
 const express = require('express');
 const {
     createBooking,
+    searchBookings,
     getBookings,
     getMyBookings,
     updateBookingStatus,
@@ -12,6 +13,7 @@ const { authorize } = require('../middleware/roleCheck');
 const router = express.Router();
 
 // Public route (can be used with or without auth)
+router.get('/search', searchBookings);
 router.post('/', createBooking);
 
 // User routes

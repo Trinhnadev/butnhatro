@@ -1,5 +1,34 @@
 const Booking = require('../models/Booking');
 const Room = require('../models/Room');
+const User = require('../models/User');
+const { sendBookingNotification } = require('../utils/emailService');
+
+// @desc    Search bookings by phone (Public)
+// @route   GET /api/bookings/search
+// @access  Public
+exports.searchBookings = async (req, res, next) => {
+    try {
+        const { phone } = req.query;
+
+        if (!phone) {
+            return res.status(400).json({
+                message: 'Please provide phone number',
+                code: 'MISSING_PHONE',
+            });
+        }
+
+        const bookings = await Booking.find({ phone })
+            .populate('roomId', 'title priceMonthly location images')
+            .sort({ createdAt: -1 });
+
+        res.json({
+            bookings,
+            count: bookings.length,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 
 // @desc    Create new booking
 // @route   POST /api/bookings
@@ -31,8 +60,21 @@ exports.createBooking = async (req, res, next) => {
 
         const booking = await Booking.create(req.body);
 
+        const User = require('../models/User'); // Ensure User model is imported at top
+
+        // ... inside createBooking ...
+
         // Populate room details
-        await booking.populate('roomId', 'title priceMonthly location');
+        await booking.populate('roomId', 'title priceMonthly location images');
+
+        // Get all admin emails
+        const admins = await User.find({ role: 'admin' }).select('email');
+        const adminEmails = admins.map(admin => admin.email);
+
+        // Send Email Notification (Non-blocking)
+        if (adminEmails.length > 0) {
+            sendBookingNotification(booking, adminEmails).catch(err => console.error('Background email failed:', err));
+        }
 
         res.status(201).json({
             booking,

@@ -46,6 +46,7 @@ export const roomAPI = {
 // Booking API
 export const bookingAPI = {
     createBooking: (data) => api.post('/bookings', data),
+    searchBookings: (phone) => api.get('/bookings/search', { params: { phone } }),
     getBookings: (params) => api.get('/bookings', { params }),
     getMyBookings: () => api.get('/bookings/my'),
     getBooking: (id) => api.get(`/bookings/${id}`),

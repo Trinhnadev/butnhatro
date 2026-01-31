@@ -6,12 +6,53 @@ import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import ContactButtons from '../../components/common/ContactButtons';
 
+const TypewriterEffect = ({ text }) => {
+    return (
+        <span className="inline-block">
+            {text}
+            <span className="animate-pulse">|</span>
+        </span>
+    );
+};
+
 const Home = () => {
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
     const [filters, setFilters] = useState({});
+
+    // Typewriter State
+    const [displayText, setDisplayText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [loopNum, setLoopNum] = useState(0);
+    const [typingSpeed, setTypingSpeed] = useState(150);
+
+    const phrases = ["Tại Cần Thơ", "Giá Tốt Nhất", "An Ninh Cao", "Đầy Đủ Tiện Nghi", "Cho Sinh Viên"];
+
+    useEffect(() => {
+        const handleTyping = () => {
+            const i = loopNum % phrases.length;
+            const fullText = phrases[i];
+
+            setDisplayText(isDeleting
+                ? fullText.substring(0, displayText.length - 1)
+                : fullText.substring(0, displayText.length + 1)
+            );
+
+            setTypingSpeed(isDeleting ? 30 : 150);
+
+            if (!isDeleting && displayText === fullText) {
+                setTimeout(() => setIsDeleting(true), 1500); // Pause at end
+            } else if (isDeleting && displayText === '') {
+                setIsDeleting(false);
+                setLoopNum(loopNum + 1);
+            }
+        };
+
+        const timer = setTimeout(handleTyping, typingSpeed);
+        return () => clearTimeout(timer);
+    }, [displayText, isDeleting, loopNum, phrases, typingSpeed]);
 
     useEffect(() => {
         fetchRooms();
@@ -47,10 +88,23 @@ const Home = () => {
 
     return (
         <div>
-            <section className="bg-gradient-to-br from-primary to-primary-dark text-white py-16 text-center mb-8">
-                <div className="max-w-7xl mx-auto px-5">
-                    <h1 className="text-4xl mb-4">Tìm nhà trọ tại Cần Thơ</h1>
-                    <p className="text-xl opacity-90">Hệ thống quản lý và tìm kiếm nhà trọ uy tín, chất lượng</p>
+            <section className="relative overflow-hidden bg-gradient-to-br from-primary to-indigo-900 text-white py-12 md:py-20 text-center mb-8">
+                {/* Background Shapes */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10">
+                    <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white blur-3xl"></div>
+                    <div className="absolute top-1/2 right-0 w-64 h-64 rounded-full bg-yellow-300 blur-3xl"></div>
+                </div>
+
+                <div className="relative max-w-7xl mx-auto px-5 z-10">
+                    <h1 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 leading-tight">
+                        <span className="block md:inline">Tìm nhà trọ</span>
+                        <span className="block md:inline text-yellow-300 md:ml-3 min-h-[40px] md:min-h-0">
+                            <TypewriterEffect text={displayText} />
+                        </span>
+                    </h1>
+                    <p className="hidden md:block text-xl text-gray-200 max-w-2xl mx-auto">
+                        Hệ thống tìm kiếm phòng trọ thông minh, kết nối trực tiếp chủ nhà và người thuê nhanh chóng, an toàn.
+                    </p>
                 </div>
             </section>
 
