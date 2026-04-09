@@ -22,6 +22,13 @@ connectDB();
 const app = express();
 const httpServer = http.createServer(app);
 
+// Configure CORS allowed origins
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://hadeshouse.vercel.app' // Vercel deployment
+];
+if (process.env.CLIENT_URL) allowedOrigins.push(process.env.CLIENT_URL);
+
 // Setup VAPID for Web Push
 webpush.setVapidDetails(
     process.env.VAPID_EMAIL,
@@ -32,7 +39,7 @@ webpush.setVapidDetails(
 // Setup Socket.io
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:5173',
+        origin: allowedOrigins,
         credentials: true,
     },
 });
@@ -59,7 +66,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
 }));
 app.use(express.json());
