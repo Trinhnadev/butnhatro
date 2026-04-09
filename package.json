@@ -1,0 +1,13 @@
+{
+  "name": "butt-nha-tro",
+  "version": "1.0.0",
+  "description": "Nha Tro Can Tho Deploy config",
+  "scripts": {
+    "install": "cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

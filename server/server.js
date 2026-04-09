@@ -78,8 +78,16 @@ app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Nha Tro API is running' });
+    res.json({ status: 'OK', message: 'Hades House API is running' });
 });
+
+// Serve frontend locally in production
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../client/dist')));
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../client', 'dist', 'index.html'));
+    });
+}
 
 // Error handler (must be last)
 app.use(errorHandler);
