@@ -34,7 +34,7 @@ const Footer = () => {
                             </p>
                             <p className="flex items-center gap-3">
                                 <span className="text-xl">📧</span>
-                                <a href="mailto:support@buttnhatro.com" className="hover:text-white transition-colors">support@buttnhatro.com</a>
+                                <a href="mailto:nguyenanhtrinh05@gmail.com" className="hover:text-white transition-colors">nguyenanhtrinh05@gmail.com</a>
                             </p>
                             <p className="flex items-center gap-3">
                                 <span className="text-xl">📞</span>
