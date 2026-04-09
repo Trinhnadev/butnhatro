@@ -153,7 +153,7 @@ const sendBookingNotification = async (booking, recipients) => {
 
                 <div style="background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
                     <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                        Email tự động từ hệ thống Butt Nha Tro<br>
+                        Email tự động từ hệ thống Hades House<br>
                         © ${new Date().getFullYear()} All rights reserved.
                     </p>
                 </div>
@@ -177,4 +177,28 @@ const sendBookingNotification = async (booking, recipients) => {
     }
 };
 
-module.exports = { sendBookingNotification };
+const sendEmail = async (options) => {
+    try {
+        const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+        if (!user) {
+            console.log('Skipping generic email: SMTP_USER/EMAIL_USER not configured');
+            return;
+        }
+
+        await transporter.sendMail({
+            from: `"Nhà Trọ System" <${user}>`,
+            to: options.to,
+            subject: options.subject,
+            text: options.text,
+            html: options.html,
+        });
+
+        console.log(`Email sent to ${options.to}`);
+        return true;
+    } catch (error) {
+        console.error('Generic email send failed:', error);
+        return false;
+    }
+};
+
+module.exports = { sendBookingNotification, sendEmail };

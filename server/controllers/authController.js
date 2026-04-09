@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const PendingUser = require('../models/PendingUser');
 const { generateToken } = require('../middleware/auth');
-const sendEmail = require('../utils/emailService');
+const { sendEmail } = require('../utils/emailService');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
@@ -52,9 +52,9 @@ exports.register = async (req, res, next) => {
 
         await sendEmail({
             to: email,
-            subject: 'Mã xác thực đăng ký - Butt Nha Tro',
+            subject: 'Mã xác thực đăng ký - Hades House',
             text: message,
-            html: `<h3>Xin chào ${name},</h3><p>Cảm ơn bạn đã đăng ký tài khoản tại Butt Nha Tro.</p><p>Mã xác thực của bạn là: <strong style="font-size: 24px;">${otp}</strong></p><p>Mã này sẽ hết hạn trong 10 phút.</p>`,
+            html: `<h3>Xin chào ${name},</h3><p>Cảm ơn bạn đã đăng ký tài khoản tại Hades House.</p><p>Mã xác thực của bạn là: <strong style="font-size: 24px;">${otp}</strong></p><p>Mã này sẽ hết hạn trong 10 phút.</p>`,
         });
 
         res.status(201).json({
@@ -160,7 +160,7 @@ exports.resendOTP = async (req, res, next) => {
 
         await sendEmail({
             to: email,
-            subject: 'Gửi lại mã xác thực - Butt Nha Tro',
+            subject: 'Gửi lại mã xác thực - Hades House',
             text: message,
             html: `<h3>Xin chào ${pendingUser.name},</h3><p>Đây là mã xác thực mới của bạn.</p><p>Mã xác thực: <strong style="font-size: 24px;">${otp}</strong></p><p>Mã này sẽ hết hạn trong 10 phút.</p>`,
         });

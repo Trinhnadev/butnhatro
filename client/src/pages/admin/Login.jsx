@@ -39,7 +39,12 @@ const Login = () => {
             if (data.user?.role === 'admin') {
                 navigate('/admin');
             } else {
-                navigate('/');
+                // If user has phone, go directly to their booking list, else go to normal search
+                if (data.user?.phone) {
+                    navigate(`/booking-list?phone=${data.user.phone}`);
+                } else {
+                    navigate('/');
+                }
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Đăng nhập thất bại');
@@ -53,7 +58,7 @@ const Login = () => {
             <div className="w-full max-w-md px-5">
                 <div className="bg-white p-10 rounded-lg shadow-custom-lg">
                     <h1 className="text-center mb-2 text-2xl font-bold">Đăng nhập</h1>
-                    <p className="text-center text-secondary mb-8">Đăng nhập vào hệ thống Butt Nha Tro</p>
+                    <p className="text-center text-secondary mb-8">Đăng nhập vào hệ thống Hades House</p>
 
                     <form onSubmit={handleSubmit}>
                         <div className="mb-6">

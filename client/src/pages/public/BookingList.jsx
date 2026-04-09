@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { bookingAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import Modal from '../../components/common/Modal';
 import { formatPrice } from '../../utils/helpers';
 
 const BookingList = () => {
@@ -18,6 +20,19 @@ const BookingList = () => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [cancelingId, setCancelingId] = useState(null);
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const [modalState, setModalState] = useState({
+        isOpen: false,
+        type: null, // 'login', 'confirmCancel', 'message'
+        title: '',
+        message: '',
+        bookingToCancel: null,
+    });
+
+    const closeModal = () => setModalState(prev => ({ ...prev, isOpen: false }));
 
     useEffect(() => {
         if (phone) {
@@ -61,6 +76,87 @@ const BookingList = () => {
 
         return streetMatch && codeMatch && dateMatch;
     });
+
+    const canCancel = (booking) => {
+        // Không hủy booking đã hủy hoặc hoàn thành
+        if (booking.status === 'canceled' || booking.status === 'done') return false;
+        // Nếu không có viewTime → cho phép hủy (sẽ yêu cầu đăng nhập nếu ấn vào)
+        if (!booking.viewTime) return true;
+        // Chỉ hiện nút hủy nếu giờ xem CHƯA qua
+        const viewTimePassed = new Date(booking.viewTime) <= new Date();
+        return !viewTimePassed;
+    };
+
+    const handleCancelClick = (booking) => {
+        if (!user) {
+            setModalState({
+                isOpen: true,
+                type: 'login',
+                title: 'Yêu cầu đăng nhập',
+                message: 'Vui lòng đăng nhập vào hệ thống để có quyền hủy lịch hẹn này.',
+                bookingToCancel: null,
+            });
+            return;
+        }
+
+        setModalState({
+            isOpen: true,
+            type: 'confirmCancel',
+            title: 'Xác nhận hủy lịch hẹn',
+            message: `Bạn có chắc chắn muốn hủy yêu cầu đặt phòng mã ${booking.bookingCode} không? Hành động này sẽ thông báo cho quản trị viên và không thể hoàn tác.`,
+            bookingToCancel: booking,
+        });
+    };
+
+    const confirmCancel = async () => {
+        const booking = modalState.bookingToCancel;
+        if (!booking) return;
+
+        try {
+            setCancelingId(booking._id);
+            closeModal(); // Đóng modal xác nhận
+            await bookingAPI.cancelBooking(booking._id);
+            setBookings(prev => prev.map(b =>
+                b._id === booking._id ? { ...b, status: 'canceled' } : b
+            ));
+            
+            // Xong thì báo modal thành công
+            setTimeout(() => {
+                setModalState({
+                    isOpen: true,
+                    type: 'message',
+                    title: 'Hủy thành công',
+                    message: 'Lịch hẹn của bạn đã được hủy bỏ.',
+                    bookingToCancel: null,
+                });
+            }, 100);
+        } catch (err) {
+            const status = err.response?.status;
+            const msg = err.response?.data?.message || 'Không thể hủy booking. Vui lòng thử lại.';
+            
+            setTimeout(() => {
+                if (status === 401 || status === 403) {
+                    setModalState({
+                        isOpen: true,
+                        type: 'login',
+                        title: 'Tài khoản không hợp lệ',
+                        message: msg,
+                        bookingToCancel: null,
+                    });
+                } else {
+                    setModalState({
+                        isOpen: true,
+                        type: 'message',
+                        title: 'Lỗi',
+                        message: msg,
+                        bookingToCancel: null,
+                    });
+                }
+            }, 100);
+        } finally {
+            setCancelingId(null);
+        }
+    };
 
     const getStatusBadge = (status) => {
         const styles = {
@@ -273,12 +369,66 @@ const BookingList = () => {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Cancel Button */}
+                                    {canCancel(booking) && (
+                                        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                                            <button
+                                                onClick={() => handleCancelClick(booking)}
+                                                disabled={cancelingId === booking._id}
+                                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {cancelingId === booking._id ? (
+                                                    <>
+                                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                                        </svg>
+                                                        Đang hủy...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                        Hủy lịch hẹn
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+
                         ))}
                     </div>
                 )}
             </div>
+
+            <Modal 
+                isOpen={modalState.isOpen} 
+                onClose={closeModal}
+                title={modalState.title}
+                actions={
+                    modalState.type === 'login' ? (
+                        <>
+                            <button onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Đóng</button>
+                            <button onClick={() => { closeModal(); navigate('/login'); }} className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm">Đến trang Đăng nhập</button>
+                        </>
+                    ) : modalState.type === 'confirmCancel' ? (
+                        <>
+                            <button onClick={closeModal} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Trở lại</button>
+                            <button onClick={confirmCancel} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm">Chắc chắn hủy</button>
+                        </>
+                    ) : (
+                        <button onClick={closeModal} className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg transition-colors shadow-sm">Đã hiểu</button>
+                    )
+                }
+            >
+                <div className={`text-[15px] ${modalState.type === 'confirmCancel' ? 'text-red-700 bg-red-50 p-4 rounded-xl border border-red-100' : ''}`}>
+                    {modalState.message}
+                </div>
+            </Modal>
         </div>
     );
 };

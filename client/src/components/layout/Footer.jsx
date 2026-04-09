@@ -1,12 +1,12 @@
 const Footer = () => {
     return (
-        <footer className="bg-gray-900 text-white pt-12 pb-6 mt-16 font-sans">
+        <footer className="hidden md:block bg-gray-900 text-white pt-12 pb-6 mt-16 font-sans">
             <div className="max-w-7xl mx-auto px-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
                     {/* Brand Section */}
                     <div>
                         <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-                            Butt Nhà Trọ
+                            Nhà Trọ
                         </h3>
                         <p className="text-gray-400 text-sm leading-relaxed mb-4">
                             Hệ thống tìm kiếm và quản lý nhà trọ hàng đầu tại Cần Thơ. Kết nối chủ nhà và người thuê nhanh chóng, uy tín và tiện lợi.
@@ -76,7 +76,7 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center pt-8 border-t border-gray-800 text-gray-500 text-sm">
-                    <p>&copy; {new Date().getFullYear()} Butt Nha Tro. Designed by Nguyen Anh Trinh.</p>
+                    <p>&copy; {new Date().getFullYear()} Hades House. Designed by Nguyen Anh Trinh.</p>
                 </div>
             </div>
         </footer>

@@ -87,8 +87,12 @@ const Register = () => {
 
         try {
             setLoading(true);
-            await verifyOTP(formData.email, otp);
-            navigate('/');
+            const data = await verifyOTP(formData.email, otp);
+            if (data.user?.phone) {
+                navigate(`/booking-list?phone=${data.user.phone}`);
+            } else {
+                navigate('/');
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Xác thực OTP thất bại');
         } finally {
@@ -116,7 +120,7 @@ const Register = () => {
                 <div className="bg-white p-10 rounded-lg shadow-custom-lg">
                     <h1 className="text-center mb-2 text-2xl font-bold">Đăng ký tài khoản</h1>
                     <p className="text-center text-secondary mb-8">
-                        {step === 1 ? 'Tạo tài khoản mới tại Butt Nha Tro' : 'Nhập mã xác thực đã được gửi đến email của bạn'}
+                        {step === 1 ? 'Tạo tài khoản mới tại Hades House' : 'Nhập mã xác thực đã được gửi đến email của bạn'}
                     </p>
 
                     {step === 1 ? (
@@ -289,8 +293,8 @@ const Register = () => {
                                         onClick={handleResendOtp}
                                         disabled={!canResend || loading}
                                         className={`font-semibold bg-transparent border-0 cursor-pointer ${canResend
-                                                ? 'text-primary hover:text-primary-dark'
-                                                : 'text-gray-400 cursor-not-allowed'
+                                            ? 'text-primary hover:text-primary-dark'
+                                            : 'text-gray-400 cursor-not-allowed'
                                             }`}
                                     >
                                         {canResend ? 'Gửi lại mã' : `Gửi lại sau ${countdown}s`}

@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { bookingAPI } from '../../services/api';
 import { formatPrice, formatDateTime, formatDate, getStatusLabel, getStatusColor } from '../../utils/helpers';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 
 const BookingManagement = () => {
+    const navigate = useNavigate();
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
+    const [showTodayOnly, setShowTodayOnly] = useState(true);
 
     // Filters state
     const [filters, setFilters] = useState({
@@ -65,7 +68,6 @@ const BookingManagement = () => {
     // Status UI Configuration
     const STATUS_STYLES = {
         pending: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-600/20',
-        contacted: 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-600/20',
         scheduled: 'bg-violet-50 text-violet-700 border-violet-200 ring-violet-600/20',
         done: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-600/20',
         canceled: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-600/20',
@@ -83,6 +85,50 @@ const BookingManagement = () => {
     // Helper to check if any filter is active
     const hasActiveFilters = filters.search || filters.status || filters.startDate || filters.endDate;
 
+    // Apply sorting logic (Pending first, then Newest)
+    const sortedBookings = useMemo(() => {
+        let result = [...bookings];
+
+        if (showTodayOnly) {
+            const today = new Date();
+            // Filter only today's view bookings
+            result = result.filter(b => {
+                if (!b.viewTime) return false;
+                const viewDate = new Date(b.viewTime);
+                return viewDate.getDate() === today.getDate() &&
+                       viewDate.getMonth() === today.getMonth() &&
+                       viewDate.getFullYear() === today.getFullYear();
+            });
+
+            // Sort by closest to now
+            return result.sort((a, b) => {
+                const now = new Date().getTime();
+                const diffA = Math.abs(new Date(a.viewTime).getTime() - now);
+                const diffB = Math.abs(new Date(b.viewTime).getTime() - now);
+                return diffA - diffB;
+            });
+        }
+
+        return result.sort((a, b) => {
+            // "pending" items go first
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (a.status !== 'pending' && b.status === 'pending') return 1;
+            
+            // then by newest (descending)
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+    }, [bookings, showTodayOnly]);
+
+    // Check if booking is NEW (created today and is pending)
+    const isNewBooking = (createdAt, status) => {
+        if (status !== 'pending') return false;
+        const today = new Date();
+        const createdDate = new Date(createdAt);
+        return createdDate.getDate() === today.getDate() &&
+               createdDate.getMonth() === today.getMonth() &&
+               createdDate.getFullYear() === today.getFullYear();
+    };
+
     // We don't return early on loading to keep filter bar visible if possible, 
     // but usually 'loading' is true on initial load.
     // if (loading && !bookings.length) return <Loading message="Đang tải danh sách đặt phòng..." />;
@@ -91,13 +137,31 @@ const BookingManagement = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-800">Quản lý đặt phòng</h2>
-                    {!loading && bookings && (
-                        <div className="text-sm text-gray-500">
-                            Tổng số: <span className="font-bold text-gray-900 ml-1">{bookings.length}</span>
-                        </div>
-                    )}
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-center w-full md:w-auto">
+                        <h2 className="text-xl font-bold text-gray-800">Quản lý đặt phòng</h2>
+                        <span className="md:hidden text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                            Tổng: <span className="font-bold text-gray-900">{sortedBookings.length}</span>
+                        </span>
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+                        <label className={`flex items-center gap-2 px-4 py-2 ${showTodayOnly ? 'bg-blue-600 text-white shadow-md shadow-blue-200 border-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'} rounded-lg border transition-all cursor-pointer font-medium text-sm select-none`}>
+                            <input 
+                                type="checkbox" 
+                                name="showTodayOnly" 
+                                checked={showTodayOnly} 
+                                onChange={(e) => setShowTodayOnly(e.target.checked)}
+                                className="hidden"
+                            />
+                            {showTodayOnly ? '📅 Lịch xem hôm nay' : '📅 Tất cả lịch hẹn'}
+                        </label>
+                        {!loading && bookings && (
+                            <div className="hidden md:block text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                                Đang hiện: <span className="font-bold text-gray-900">{sortedBookings.length}</span> / {bookings.length}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Mobile Filter Toggle */}
@@ -118,7 +182,7 @@ const BookingManagement = () => {
 
                 {/* Filter Bar */}
                 <div className={`bg-white p-4 rounded-xl border border-gray-200 shadow-sm ${showFilters ? 'block' : 'hidden md:block'}`}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Search */}
                         <div className="lg:col-span-2">
                             <label className="block text-xs font-medium text-gray-500 mb-1 lg:hidden">Tìm kiếm</label>
@@ -148,7 +212,6 @@ const BookingManagement = () => {
                             >
                                 <option value="">Tất cả trạng thái</option>
                                 <option value="pending">Chờ xử lý</option>
-                                <option value="contacted">Đã liên hệ</option>
                                 <option value="scheduled">Đã hẹn</option>
                                 <option value="done">Hoàn thành</option>
                                 <option value="canceled">Đã hủy</option>
@@ -190,7 +253,7 @@ const BookingManagement = () => {
                             {hasActiveFilters && (
                                 <button
                                     onClick={handleResetFilters}
-                                    className="px-4 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-sm w-full md:w-auto border border-gray-200 md:border-transparent"
+                                    className="px-4 py-2 mt-auto text-gray-500 hover:text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors text-sm w-full md:w-auto border border-gray-200 flex-shrink-0 font-medium"
                                 >
                                     ✕ Xóa bộ lọc
                                 </button>
@@ -239,12 +302,21 @@ const BookingManagement = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {bookings.map((booking) => (
-                                    <tr key={booking._id} className="hover:bg-gray-50 transition-colors duration-150">
+                                {sortedBookings.map((booking) => (
+                                    <tr 
+                                        key={booking._id} 
+                                        onClick={() => navigate(`/admin/bookings/${booking._id}`)}
+                                        className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                    >
                                         <td className="px-6 py-4">
-                                            <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded text-xs">
-                                                {booking.bookingCode}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded text-xs">
+                                                    {booking.bookingCode}
+                                                </span>
+                                                {isNewBooking(booking.createdAt, booking.status) && (
+                                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse">NEW</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
@@ -272,18 +344,22 @@ const BookingManagement = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">{formatDate(booking.createdAt)}</td>
-                                        <td className="px-6 py-4">
-                                            <select
-                                                value={booking.status}
-                                                onChange={(e) => handleStatusChange(booking._id, e.target.value)}
-                                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-xs py-1.5"
-                                            >
-                                                <option value="pending">Chờ xử lý</option>
-                                                <option value="contacted">Đã liên hệ</option>
-                                                <option value="scheduled">Đã hẹn</option>
-                                                <option value="done">Hoàn thành</option>
-                                                <option value="canceled">Đã hủy</option>
-                                            </select>
+                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                            <div className="relative">
+                                                <select
+                                                    value={booking.status}
+                                                    onChange={(e) => handleStatusChange(booking._id, e.target.value)}
+                                                    className="appearance-none block w-full bg-gray-50 border border-gray-200 text-gray-700 py-1.5 px-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-xs font-medium cursor-pointer transition-colors"
+                                                >
+                                                    <option value="pending" className="font-medium text-amber-700">Chờ xử lý</option>
+                                                    <option value="scheduled" className="font-medium text-violet-700">Đã hẹn</option>
+                                                    <option value="done" className="font-medium text-emerald-700">Hoàn thành</option>
+                                                    <option value="canceled" className="font-medium text-rose-700">Đã hủy</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                                                    <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -293,13 +369,22 @@ const BookingManagement = () => {
 
                     {/* Mobile Card View */}
                     <div className="md:hidden grid grid-cols-1 gap-4">
-                        {bookings.map((booking) => (
-                            <div key={booking._id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3">
+                        {sortedBookings.map((booking) => (
+                            <div 
+                                key={booking._id} 
+                                onClick={() => navigate(`/admin/bookings/${booking._id}`)}
+                                className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3 cursor-pointer active:bg-gray-50"
+                            >
                                 {/* Header: Code & Status */}
                                 <div className="flex justify-between items-start">
-                                    <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded text-xs">
-                                        {booking.bookingCode}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded text-xs">
+                                            {booking.bookingCode}
+                                        </span>
+                                        {isNewBooking(booking.createdAt, booking.status) && (
+                                            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse">NEW</span>
+                                        )}
+                                    </div>
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${STATUS_STYLES[booking.status] || 'bg-gray-100 text-gray-800'}`}>
                                         <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-60"></span>
                                         {getStatusLabel(booking.status)}
@@ -334,19 +419,23 @@ const BookingManagement = () => {
                                 </div>
 
                                 {/* Footer: Update Status */}
-                                <div className="pt-3 border-t border-gray-100 flex items-center gap-2 mt-auto">
-                                    <label className="text-xs text-gray-500 font-medium">Cập nhật:</label>
-                                    <select
-                                        value={booking.status}
-                                        onChange={(e) => handleStatusChange(booking._id, e.target.value)}
-                                        className="flex-grow rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
-                                    >
-                                        <option value="pending">Chờ xử lý</option>
-                                        <option value="contacted">Đã liên hệ</option>
-                                        <option value="scheduled">Đã hẹn</option>
-                                        <option value="done">Hoàn thành</option>
-                                        <option value="canceled">Đã hủy</option>
-                                    </select>
+                                <div className="pt-3 border-t border-gray-100 flex items-center gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+                                    <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Trạng thái:</label>
+                                    <div className="relative w-full">
+                                        <select
+                                            value={booking.status}
+                                            onChange={(e) => handleStatusChange(booking._id, e.target.value)}
+                                            className="appearance-none flex-grow w-full bg-gray-50 border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-medium cursor-pointer transition-colors"
+                                        >
+                                            <option value="pending" className="font-medium text-amber-700">Chờ xử lý</option>
+                                            <option value="scheduled" className="font-medium text-violet-700">Đã hẹn</option>
+                                            <option value="done" className="font-medium text-emerald-700">Hoàn thành</option>
+                                            <option value="canceled" className="font-medium text-rose-700">Đã hủy</option>
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))}

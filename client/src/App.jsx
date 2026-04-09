@@ -8,11 +8,15 @@ import BookingPage from './pages/public/BookingPage';
 import BookingSearch from './pages/public/BookingSearch';
 import BookingList from './pages/public/BookingList';
 import Register from './pages/public/Register';
+import Offline from './pages/public/Offline';
+import Notifications from './pages/public/Notifications';
 import Login from './pages/admin/Login';
 import Dashboard from './pages/admin/Dashboard';
 import BookingDetail from './pages/admin/BookingDetail';
 import Loading from './components/common/Loading';
 import ScrollToTop from './components/common/ScrollToTop';
+import InstallPrompt from './components/common/InstallPrompt';
+import NetworkMonitor from './components/common/NetworkMonitor';
 
 // Protected route wrapper
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -37,9 +41,11 @@ function AppContent() {
     return (
         <Router>
             <ScrollToTop />
+            <NetworkMonitor />
+            <InstallPrompt />
             <div className="flex flex-col min-h-screen">
                 <Header />
-                <main className="flex-grow">
+                <main className="flex-grow pb-16 md:pb-0">
                     <Routes>
                         {/* Public routes */}
                         <Route path="/" element={<Home />} />
@@ -49,6 +55,15 @@ function AppContent() {
                         <Route path="/booking-list" element={<BookingList />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/offline" element={<Offline />} />
+                        <Route 
+                            path="/notifications" 
+                            element={
+                                <ProtectedRoute>
+                                    <Notifications />
+                                </ProtectedRoute>
+                            } 
+                        />
 
                         {/* Admin routes */}
                         <Route

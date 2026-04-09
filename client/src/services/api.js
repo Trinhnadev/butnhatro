@@ -51,6 +51,7 @@ export const bookingAPI = {
     getMyBookings: () => api.get('/bookings/my'),
     getBooking: (id) => api.get(`/bookings/${id}`),
     updateBookingStatus: (id, status) => api.patch(`/bookings/${id}/status`, { status }),
+    cancelBooking: (id) => api.patch(`/bookings/${id}/cancel`),
 };
 
 // Upload API

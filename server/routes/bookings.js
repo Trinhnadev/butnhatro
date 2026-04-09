@@ -5,6 +5,7 @@ const {
     getBookings,
     getMyBookings,
     updateBookingStatus,
+    cancelBooking,
     getBooking,
 } = require('../controllers/bookingController');
 const { protect } = require('../middleware/auth');
@@ -18,6 +19,7 @@ router.post('/', createBooking);
 
 // User routes
 router.get('/my', protect, getMyBookings);
+router.patch('/:id/cancel', protect, cancelBooking);
 
 // Admin routes
 router.get('/', protect, authorize('admin'), getBookings);
