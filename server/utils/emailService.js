@@ -26,6 +26,7 @@ const formatDate = (date) => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'Asia/Ho_Chi_Minh',
     });
 };
 
@@ -91,10 +92,10 @@ const sendBookingNotification = async (booking, recipients) => {
                                     <div style="margin-bottom: 16px;">
                                         <div style="font-size: 11px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">XEM PHÒNG</div>
                                         <div style="font-size: 18px; color: #2563eb; font-weight: 700;">
-                                            ${new Date(booking.viewTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                            ${new Date(booking.viewTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
                                         </div>
                                         <div style="font-size: 13px; color: #334155;">
-                                            ${new Date(booking.viewTime).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                            ${new Date(booking.viewTime).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })}
                                         </div>
                                     </div>
 
@@ -177,6 +178,91 @@ const sendBookingNotification = async (booking, recipients) => {
     }
 };
 
+const sendViewingReminderEmail = async (booking, recipients) => {
+    try {
+        const user = process.env.SMTP_USER || process.env.EMAIL_USER;
+        if (!user || !recipients || recipients.length === 0) return;
+
+        const dashboardLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/bookings/${booking._id}`;
+        
+        const viewTimeStr = new Date(booking.viewTime).toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            timeZone: 'Asia/Ho_Chi_Minh' 
+        });
+        const viewDateStr = new Date(booking.viewTime).toLocaleDateString('vi-VN', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric', 
+            timeZone: 'Asia/Ho_Chi_Minh' 
+        });
+
+        const htmlTemplate = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Viewing Reminder</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #fff1f2; font-family: 'Helvetica Neue', Arial, sans-serif;">
+            <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 2px solid #fda4af;">
+                
+                <!-- Urgent Header -->
+                <div style="background-color: #e11d48; padding: 24px; text-align: center;">
+                    <div style="font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">⏰ NHẮC LỊCH SẮP ĐẾN</div>
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff;">SẮP ĐẾN GIỜ XEM PHÒNG — CẦN LIÊN HỆ NGAY</h1>
+                </div>
+
+                <div style="padding: 32px 24px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <div style="font-size: 40px; color: #e11d48; font-weight: 800; margin-bottom: 4px;">${viewTimeStr}</div>
+                        <div style="font-size: 16px; color: #4b5563;">Hôm nay, ngày ${viewDateStr}</div>
+                    </div>
+
+                    <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
+                        <h3 style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; text-transform: uppercase;">Thông tin khách hàng</h3>
+                        <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">${booking.customerName}</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #e11d48; margin-bottom: 12px;">
+                            <a href="tel:${booking.phone}" style="color: #e11d48; text-decoration: none;">📞 ${booking.phone}</a>
+                        </div>
+                        <div style="padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                            <div style="font-size: 13px; color: #64748b;">Phòng đang xem:</div>
+                            <div style="font-size: 15px; font-weight: 600; color: #1e293b;">${booking.roomId?.title || 'N/A'}</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 32px; text-align: center;">
+                        <a href="${dashboardLink}" style="display: inline-block; background-color: #e11d48; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 6px rgba(225, 29, 72, 0.2);">
+                            Mở Chi Tiết Booking
+                        </a>
+                    </div>
+                </div>
+
+                <div style="background-color: #fdf2f2; padding: 20px; text-align: center; border-top: 1px solid #fee2e2;">
+                    <p style="margin: 0; color: #991b1b; font-size: 12px; font-weight: 600;">
+                        Vui lòng chuẩn bị và liên hệ khách trước khi đến giờ hẹn 15-30 phút.
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        await transporter.sendMail({
+            from: `"Nhắc Lịch Hades House" <${user}>`,
+            to: recipients,
+            subject: `🚨 [NHẮC LỊCH] ${viewTimeStr} - ${booking.customerName} xem phòng`,
+            html: htmlTemplate,
+        });
+
+        console.log(`Viewing reminder email sent to admins for booking ${booking.bookingCode}`);
+        return true;
+    } catch (error) {
+        console.error('Viewing reminder email failed:', error);
+        return false;
+    }
+};
+
 const sendEmail = async (options) => {
     try {
         const user = process.env.SMTP_USER || process.env.EMAIL_USER;
@@ -201,4 +287,4 @@ const sendEmail = async (options) => {
     }
 };
 
-module.exports = { sendBookingNotification, sendEmail };
+module.exports = { sendBookingNotification, sendEmail, sendViewingReminderEmail };

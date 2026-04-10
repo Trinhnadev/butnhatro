@@ -57,6 +57,10 @@ const bookingSchema = new mongoose.Schema(
             type: String,
             unique: true,
         },
+        reminderSent: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,
@@ -69,6 +73,8 @@ bookingSchema.index({ status: 1 });
 bookingSchema.index({ createdAt: -1 });
 bookingSchema.index({ phone: 1 });
 bookingSchema.index({ bookingCode: 1 });
+bookingSchema.index({ viewTime: 1 });
+bookingSchema.index({ status: 1, reminderSent: 1, viewTime: 1 }); // Optimized index for cron job
 
 // Generate booking code before saving
 // Generate booking code before saving

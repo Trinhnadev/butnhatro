@@ -153,6 +153,8 @@ const BookingPage = () => {
             const response = await bookingAPI.createBooking({
                 roomId,
                 ...formData,
+                viewTime: new Date(formData.viewTime + ':00+07:00').toISOString(),
+                moveInDate: new Date(formData.moveInDate + 'T00:00:00+07:00').toISOString(),
             });
 
             setSuccess({

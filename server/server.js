@@ -15,9 +15,13 @@ const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
 const uploadRoutes = require('./routes/upload');
 const notificationRoutes = require('./routes/notifications');
+const { initCronJobs } = require('./utils/cronJob');
 
 // Connect to database
-connectDB();
+connectDB().then(() => {
+    // Initialize cron jobs after DB connection
+    initCronJobs();
+});
 
 const app = express();
 const httpServer = http.createServer(app);
