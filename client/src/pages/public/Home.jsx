@@ -5,6 +5,7 @@ import RoomFilter from '../../components/room/RoomFilter';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import ContactButtons from '../../components/common/ContactButtons';
+import Pagination from '../../components/common/Pagination';
 
 const TypewriterEffect = ({ text }) => {
     return (
@@ -64,7 +65,7 @@ const Home = () => {
             setError(null);
             const response = await roomAPI.getRooms({
                 page: pagination.page,
-                limit: 12,
+                limit: 9,
                 ...filters,
             });
             setRooms(response.data.rooms);
@@ -134,29 +135,10 @@ const Home = () => {
                             ))}
                         </div>
 
-                        {pagination.pages > 1 && (
-                            <div className="flex justify-center items-center gap-4 my-8">
-                                <button
-                                    onClick={() => handlePageChange(pagination.page - 1)}
-                                    disabled={pagination.page === 1}
-                                    className="px-6 py-3 bg-white text-dark border border-border rounded-lg font-semibold cursor-pointer transition-all hover:bg-light disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    ← Trước
-                                </button>
-
-                                <span className="font-semibold">
-                                    Trang {pagination.page} / {pagination.pages}
-                                </span>
-
-                                <button
-                                    onClick={() => handlePageChange(pagination.page + 1)}
-                                    disabled={pagination.page === pagination.pages}
-                                    className="px-6 py-3 bg-white text-dark border border-border rounded-lg font-semibold cursor-pointer transition-all hover:bg-light disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Sau →
-                                </button>
-                            </div>
-                        )}
+                        <Pagination
+                            pagination={pagination}
+                            onPageChange={handlePageChange}
+                        />
                     </>
                 )}
             </div>

@@ -4,6 +4,7 @@ import { bookingAPI } from '../../services/api';
 import { formatPrice, formatDateTime, formatDate, getStatusLabel, getStatusColor } from '../../utils/helpers';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import Pagination from '../../components/common/Pagination';
 
 const BookingManagement = () => {
     const navigate = useNavigate();
@@ -20,6 +21,13 @@ const BookingManagement = () => {
         startDate: '',
         endDate: '',
     });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        pages: 1,
+        total: 0,
+        limit: 10
+    });
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -27,7 +35,12 @@ const BookingManagement = () => {
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [filters]);
+    }, [filters, showTodayOnly, currentPage]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filters, showTodayOnly]);
 
     const fetchBookings = async () => {
         try {
@@ -35,12 +48,27 @@ const BookingManagement = () => {
             setError(null);
 
             // Remove empty filters
-            const params = Object.fromEntries(
+            let params = Object.fromEntries(
                 Object.entries(filters).filter(([_, v]) => v !== '')
             );
 
+            if (showTodayOnly) {
+                const today = new Date();
+                const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+                const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+                
+                params.viewTimeStart = startOfDay;
+                params.viewTimeEnd = endOfDay;
+                params.sortBy = 'viewTime';
+                params.sortOrder = 'asc';
+            }
+
+            // Add pagination page
+            params.page = currentPage;
+
             const response = await bookingAPI.getBookings(params);
             setBookings(response.data.bookings);
+            setPagination(response.data.pagination || { page: 1, pages: 1, total: response.data.bookings.length, limit: 10 });
         } catch (err) {
             setError(err.response?.data?.message || 'Không thể tải danh sách đặt phòng');
         } finally {
@@ -90,22 +118,24 @@ const BookingManagement = () => {
         let result = [...bookings];
 
         if (showTodayOnly) {
-            const today = new Date();
-            // Filter only today's view bookings
-            result = result.filter(b => {
-                if (!b.viewTime) return false;
-                const viewDate = new Date(b.viewTime);
-                return viewDate.getDate() === today.getDate() &&
-                       viewDate.getMonth() === today.getMonth() &&
-                       viewDate.getFullYear() === today.getFullYear();
-            });
+            const now = new Date();
+            let result = [...bookings];
 
-            // Sort by closest to now
+            // Sort logic: 
+            // 1. Upcoming appointments first (Asc)
+            // 2. Past appointments last (Desc)
             return result.sort((a, b) => {
-                const now = new Date().getTime();
-                const diffA = Math.abs(new Date(a.viewTime).getTime() - now);
-                const diffB = Math.abs(new Date(b.viewTime).getTime() - now);
-                return diffA - diffB;
+                const timeA = new Date(a.viewTime);
+                const timeB = new Date(b.viewTime);
+                
+                const isPastA = timeA < now;
+                const isPastB = timeB < now;
+                
+                if (!isPastA && isPastB) return -1;
+                if (isPastA && !isPastB) return 1;
+                
+                if (!isPastA && !isPastB) return timeA - timeB;
+                return timeB - timeA;
             });
         }
 
@@ -127,6 +157,24 @@ const BookingManagement = () => {
         return createdDate.getDate() === today.getDate() &&
                createdDate.getMonth() === today.getMonth() &&
                createdDate.getFullYear() === today.getFullYear();
+    };
+
+    // Helper to check urgency (within 15 mins)
+    const getUrgencyBadge = (viewTime) => {
+        if (!viewTime) return null;
+        const now = new Date();
+        const vTime = new Date(viewTime);
+        const diffMins = (vTime - now) / (1000 * 60);
+
+        // Show badge only if upcoming within 15 mins
+        if (diffMins > 0 && diffMins <= 15) {
+            return (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white animate-pulse shadow-sm whitespace-nowrap">
+                    🕑 SẮP ĐẾN GIỜ ({Math.ceil(diffMins)}p)
+                </span>
+            );
+        }
+        return null;
     };
 
     // We don't return early on loading to keep filter bar visible if possible, 
@@ -332,7 +380,10 @@ const BookingManagement = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
-                                            {formatDateTime(booking.viewTime)}
+                                            <div className="flex flex-col gap-1">
+                                                <span>{formatDateTime(booking.viewTime)}</span>
+                                                {getUrgencyBadge(booking.viewTime)}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
                                             {formatDate(booking.moveInDate)}
@@ -409,7 +460,10 @@ const BookingManagement = () => {
                                         </div>
                                         <div className="text-gray-700 text-sm flex items-start gap-2">
                                             <span className="min-w-[70px] text-gray-500 text-xs">Xem phòng:</span>
-                                            <span className="font-medium">{formatDateTime(booking.viewTime)}</span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-medium">{formatDateTime(booking.viewTime)}</span>
+                                                {getUrgencyBadge(booking.viewTime)}
+                                            </div>
                                         </div>
                                         <div className="text-gray-700 text-sm flex items-start gap-2">
                                             <span className="min-w-[70px] text-gray-500 text-xs">Dọn vào:</span>
@@ -440,6 +494,11 @@ const BookingManagement = () => {
                             </div>
                         ))}
                     </div>
+
+                    <Pagination 
+                        pagination={pagination} 
+                        onPageChange={(page) => setCurrentPage(page)} 
+                    />
                 </>
             )}
         </div>

@@ -72,7 +72,6 @@ bookingSchema.index({ roomId: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ createdAt: -1 });
 bookingSchema.index({ phone: 1 });
-bookingSchema.index({ bookingCode: 1 });
 bookingSchema.index({ viewTime: 1 });
 bookingSchema.index({ status: 1, reminderSent: 1, viewTime: 1 }); // Optimized index for cron job
 

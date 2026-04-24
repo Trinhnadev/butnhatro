@@ -4,6 +4,8 @@ import { formatPrice, formatDate } from '../../utils/helpers';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import RoomForm from '../../components/room/RoomForm';
+import Pagination from '../../components/common/Pagination';
+import Modal from '../../components/common/Modal';
 import { majorStreets, priceRanges } from '../../utils/constants';
 
 const RoomManagement = () => {
@@ -12,6 +14,17 @@ const RoomManagement = () => {
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [editingRoom, setEditingRoom] = useState(null);
+    const [successModal, setSuccessModal] = useState({
+        show: false,
+        message: ''
+    });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        pages: 1,
+        total: 0,
+        limit: 10
+    });
 
     // Filters state
     const [filters, setFilters] = useState({
@@ -27,6 +40,11 @@ const RoomManagement = () => {
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
+    }, [filters, currentPage]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
     }, [filters]);
 
     const fetchRooms = async () => {
@@ -35,7 +53,8 @@ const RoomManagement = () => {
             setError(null);
 
             const params = {
-                limit: 100,
+                limit: 10,
+                page: currentPage,
                 search: filters.search,
                 district: filters.district,
                 priceRange: filters.priceRange,
@@ -44,22 +63,6 @@ const RoomManagement = () => {
             // Handle status filter
             if (filters.status === 'archived') {
                 params.includeArchived = 'true';
-                // In backend if we want ONLY archived, we might need logic update, 
-                // but currently backend: includeArchived='true' means queries where isArchived is NOT filtered out?
-                // Let's re-read backend logic:
-                // if (includeArchived !== 'true') { query.isArchived = false; }
-                // So if includeArchived='true', it shows BOTH active and archived.
-                // We want to filter specifically by status.
-                // Backend logic seems to default to active only. 
-                // If includeArchived=true, it REMOVES the isArchived=false constraint.
-                // So it returns ALL.
-                // To get ONLY archived, we might need client side filtering OR backend update.
-                // For now let's assume 'includeArchived=true' returns mixed and we filter or we accept mixed.
-                // But wait, the previous code had a checkbox for 'showArchived'.
-                // If checkbox was true, it passed includeArchived='true'.
-                // If checkbox was false, it passed 'false' -> query.isArchived = false.
-
-                // Let's rely on api params.
             } else if (filters.status === 'all') {
                 params.includeArchived = 'true';
             } else {
@@ -78,6 +81,7 @@ const RoomManagement = () => {
             }
 
             setRooms(fetchedRooms);
+            setPagination(response.data.pagination || { page: 1, pages: 1, total: response.data.rooms.length, limit: 10 });
         } catch (err) {
             setError(err.response?.data?.message || 'Không thể tải danh sách phòng');
         } finally {
@@ -137,10 +141,16 @@ const RoomManagement = () => {
         try {
             if (editingRoom) {
                 await roomAPI.updateRoom(editingRoom._id, roomData);
-                alert('Cập nhật phòng thành công');
+                setSuccessModal({
+                    show: true,
+                    message: 'Thông tin phòng đã được cập nhật thành công!'
+                });
             } else {
                 await roomAPI.createRoom(roomData);
-                alert('Tạo phòng mới thành công');
+                setSuccessModal({
+                    show: true,
+                    message: 'Phòng mới đã được đăng và sẵn sàng hiển thị!'
+                });
             }
             setShowModal(false);
             setEditingRoom(null);
@@ -157,17 +167,11 @@ const RoomManagement = () => {
     };
 
     const openEditModal = (room) => {
-        // Prepare data for form if mismatched structure
         setEditingRoom(room);
         setShowModal(true);
     };
 
     const [showFilters, setShowFilters] = useState(false);
-
-    // ... existing loading/error checks ...
-
-    // if (loading && !rooms.length) return <Loading message="Đang tải danh sách phòng..." />;
-    // if (error) return <ErrorMessage message={error} onRetry={fetchRooms} />;
 
     return (
         <div className="space-y-6">
@@ -333,7 +337,7 @@ const RoomManagement = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 font-medium text-blue-600 whitespace-nowrap">{room.priceMonthly} Triệu/tháng</td>
-                                        <td className="px-6 py-4 text-gray-600">{room.location.streetAddress}</td>
+                                        <td className="px-6 py-4 text-gray-600 text-sm max-w-[170px] truncate" title={room.location.streetAddress}>{room.location.streetAddress}</td>
                                         <td className="px-6 py-4 text-gray-600">
                                             {room.areaMin && room.areaMax
                                                 ? `${room.areaMin}-${room.areaMax}m²`
@@ -481,6 +485,11 @@ const RoomManagement = () => {
                             </div>
                         ))}
                     </div>
+
+                    <Pagination 
+                        pagination={pagination} 
+                        onPageChange={(page) => setCurrentPage(page)} 
+                    />
                 </>
             )}
 
@@ -509,6 +518,78 @@ const RoomManagement = () => {
                     </div>
                 </div>
             )}
+
+            {/* Success Modal */}
+            <Modal
+                isOpen={successModal.show}
+                onClose={() => setSuccessModal(prev => ({ ...prev, show: false }))}
+                actions={
+                    <button
+                        onClick={() => setSuccessModal(prev => ({ ...prev, show: false }))}
+                        className="w-full px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                        Tuyệt vời!
+                    </button>
+                }
+            >
+                <div className="flex flex-col items-center text-center w-full py-2">
+                    <div className="mb-4">
+                        <svg className="checkmark-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                            <circle className="checkmark-svg__circle" cx="26" cy="26" r="25" fill="none"/>
+                            <path className="checkmark-svg__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                        </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Thành công!</h3>
+                    <p className="text-gray-600 leading-relaxed max-w-[240px]">
+                        {successModal.message}
+                    </p>
+                </div>
+            </Modal>
+
+            <style>{`
+                .checkmark-svg {
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    display: block;
+                    stroke-width: 3;
+                    stroke: #fff;
+                    stroke-miterlimit: 10;
+                    margin: 0 auto;
+                    box-shadow: inset 0px 0px 0px #10b981;
+                    animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+                }
+
+                .checkmark-svg__circle {
+                    stroke-dasharray: 166;
+                    stroke-dashoffset: 166;
+                    stroke-width: 3;
+                    stroke-miterlimit: 10;
+                    stroke: #10b981;
+                    fill: none;
+                    animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                }
+
+                .checkmark-svg__check {
+                    transform-origin: 50% 50%;
+                    stroke-dasharray: 48;
+                    stroke-dashoffset: 48;
+                    animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+                }
+
+                @keyframes stroke {
+                    100% { stroke-dashoffset: 0; }
+                }
+
+                @keyframes scale {
+                    0%, 100% { transform: none; }
+                    50% { transform: scale3d(1.1, 1.1, 1); }
+                }
+
+                @keyframes fill {
+                    100% { box-shadow: inset 0px 0px 0px 32px #10b981; }
+                }
+            `}</style>
         </div>
     );
 };

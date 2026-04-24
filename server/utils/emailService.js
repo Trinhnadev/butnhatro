@@ -178,12 +178,17 @@ const sendBookingNotification = async (booking, recipients) => {
     }
 };
 
-const sendViewingReminderEmail = async (booking, recipients) => {
+const sendViewingReminderEmail = async (booking, recipients, isGuest = false) => {
     try {
         const user = process.env.SMTP_USER || process.env.EMAIL_USER;
         if (!user || !recipients || recipients.length === 0) return;
 
-        const dashboardLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/bookings/${booking._id}`;
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+        
+        // Link changes based on recipient: Admin goes to detail, Guest goes to their list (public)
+        const actionLink = isGuest 
+            ? `${clientUrl}/booking-list?phone=${booking.phone}`
+            : `${clientUrl}/admin/bookings/${booking._id}`;
         
         const viewTimeStr = new Date(booking.viewTime).toLocaleTimeString('vi-VN', { 
             hour: '2-digit', 
@@ -197,6 +202,15 @@ const sendViewingReminderEmail = async (booking, recipients) => {
             timeZone: 'Asia/Ho_Chi_Minh' 
         });
 
+        // Dynamic content based on recipient type
+        const title = isGuest ? 'Lịch Hẹn Xem Phòng Sắp Đến' : 'SẮP ĐẾN GIỜ XEM PHÒNG — CẦN LIÊN HỆ NGAY';
+        const greeting = isGuest ? `Chào ${booking.customerName},` : `⏰ NHẮC LỊCH SẮP ĐẾN`;
+        const subTitle = isGuest ? 'Bạn có lịch hẹn xem phòng trong 1 tiếng tới.' : 'Bạn có một lịch hẹn cần tư vấn cho khách.';
+        const buttonText = isGuest ? 'Xem Chi Tiết Yêu Cầu' : 'Mở Chi Tiết Booking';
+        const primaryColor = isGuest ? '#2563eb' : '#e11d48';
+        const bgColor = isGuest ? '#f0f9ff' : '#fff1f2';
+        const borderColor = isGuest ? '#bae6fd' : '#fda4af';
+
         const htmlTemplate = `
         <!DOCTYPE html>
         <html>
@@ -204,43 +218,65 @@ const sendViewingReminderEmail = async (booking, recipients) => {
             <meta charset="utf-8">
             <title>Viewing Reminder</title>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #fff1f2; font-family: 'Helvetica Neue', Arial, sans-serif;">
-            <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 2px solid #fda4af;">
+        <body style="margin: 0; padding: 0; background-color: ${bgColor}; font-family: 'Helvetica Neue', Arial, sans-serif;">
+            <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 2px solid ${borderColor};">
                 
-                <!-- Urgent Header -->
-                <div style="background-color: #e11d48; padding: 24px; text-align: center;">
-                    <div style="font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">⏰ NHẮC LỊCH SẮP ĐẾN</div>
-                    <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff;">SẮP ĐẾN GIỜ XEM PHÒNG — CẦN LIÊN HỆ NGAY</h1>
+                <!-- Header -->
+                <div style="background-color: ${primaryColor}; padding: 24px; text-align: center;">
+                    <div style="font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">${greeting}</div>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #ffffff;">${title}</h1>
                 </div>
 
                 <div style="padding: 32px 24px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <div style="font-size: 40px; color: #e11d48; font-weight: 800; margin-bottom: 4px;">${viewTimeStr}</div>
+                    <p style="text-align: center; color: #4b5563; margin-top: 0;">${subTitle}</p>
+                    
+                    <div style="text-align: center; margin-bottom: 30px; background-color: #f8fafc; padding: 20px; border-radius: 12px;">
+                        <div style="font-size: 40px; color: ${primaryColor}; font-weight: 800; margin-bottom: 4px;">${viewTimeStr}</div>
                         <div style="font-size: 16px; color: #4b5563;">Hôm nay, ngày ${viewDateStr}</div>
                     </div>
 
-                    <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
-                        <h3 style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; text-transform: uppercase;">Thông tin khách hàng</h3>
-                        <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">${booking.customerName}</div>
-                        <div style="font-size: 20px; font-weight: 800; color: #e11d48; margin-bottom: 12px;">
-                            <a href="tel:${booking.phone}" style="color: #e11d48; text-decoration: none;">📞 ${booking.phone}</a>
-                        </div>
-                        <div style="padding-top: 12px; border-top: 1px dashed #cbd5e1;">
-                            <div style="font-size: 13px; color: #64748b;">Phòng đang xem:</div>
-                            <div style="font-size: 15px; font-weight: 600; color: #1e293b;">${booking.roomId?.title || 'N/A'}</div>
+                    <!-- Room Info with Image -->
+                    <div style="background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        ${booking.roomId?.images && booking.roomId.images[0] ? 
+                            `<img src="${booking.roomId.images[0].url}" style="width: 100%; height: 200px; object-fit: cover;" alt="Room" />` : ''
+                        }
+                        <div style="padding: 16px;">
+                            <div style="font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 700;">🏠 Căn phòng:</div>
+                            <div style="font-size: 17px; font-weight: 700; color: #1e293b; margin: 4px 0;">${booking.roomId?.title || 'Phòng trọ'}</div>
+                            <div style="font-size: 14px; color: ${primaryColor}; font-weight: 700;">${booking.roomId?.priceMonthly} Triệu / tháng</div>
                         </div>
                     </div>
 
-                    <div style="margin-top: 32px; text-align: center;">
-                        <a href="${dashboardLink}" style="display: inline-block; background-color: #e11d48; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 6px rgba(225, 29, 72, 0.2);">
-                            Mở Chi Tiết Booking
+                    ${isGuest ? `
+                    <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
+                        <div style="font-size: 14px; color: #0369a1; font-weight: 700; margin-bottom: 8px;">📞 THÔNG TIN LIÊN HỆ</div>
+                        <div style="font-size: 15px; color: #0c4a6e; margin-bottom: 12px;">Bạn vui lòng liên hệ trước để được hỗ trợ tốt nhất:</div>
+                        <a href="tel:0919723728" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 50px; font-weight: 700; font-size: 18px;">
+                            0919.723.728 (Call/Zalo)
+                        </a>
+                    </div>
+                    ` : ''}
+
+                    ${!isGuest ? `
+                    <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #64748b; text-transform: uppercase;">Thông tin khách hàng</h3>
+                        <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${booking.customerName}</div>
+                        <div style="font-size: 20px; font-weight: 800; color: ${primaryColor};">
+                            <a href="tel:${booking.phone}" style="color: ${primaryColor}; text-decoration: none;">📞 ${booking.phone}</a>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <div style="text-align: center;">
+                        <a href="${actionLink}" style="display: inline-block; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            ${buttonText}
                         </a>
                     </div>
                 </div>
 
-                <div style="background-color: #fdf2f2; padding: 20px; text-align: center; border-top: 1px solid #fee2e2;">
-                    <p style="margin: 0; color: #991b1b; font-size: 12px; font-weight: 600;">
-                        Vui lòng chuẩn bị và liên hệ khách trước khi đến giờ hẹn 15-30 phút.
+                <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+                    <p style="margin: 0; color: #64748b; font-size: 12px;">
+                        ${isGuest ? 'Hades House hân hạnh được đồng hành cùng bạn!' : 'Vui lòng chuẩn bị và liên hệ khách trước giờ hẹn.'}
                     </p>
                 </div>
             </div>
@@ -249,16 +285,16 @@ const sendViewingReminderEmail = async (booking, recipients) => {
         `;
 
         await transporter.sendMail({
-            from: `"Nhắc Lịch Hades House" <${user}>`,
+            from: `"Hades House" <${user}>`,
             to: recipients,
-            subject: `🚨 [NHẮC LỊCH] ${viewTimeStr} - ${booking.customerName} xem phòng`,
+            subject: isGuest ? `[Nhắc hẹn] Lịch xem phòng của bạn lúc ${viewTimeStr}` : `🚨 [ADMIN] ${viewTimeStr} - ${booking.customerName} xem phòng`,
             html: htmlTemplate,
         });
 
-        console.log(`Viewing reminder email sent to admins for booking ${booking.bookingCode}`);
+        console.log(`Reminder email sent to ${isGuest ? 'guest' : 'admins'} for booking ${booking.bookingCode}`);
         return true;
     } catch (error) {
-        console.error('Viewing reminder email failed:', error);
+        console.error('Email reminder failed:', error);
         return false;
     }
 };

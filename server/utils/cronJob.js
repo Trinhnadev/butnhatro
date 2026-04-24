@@ -10,6 +10,25 @@ const initCronJobs = () => {
             console.log('🔍 Checking for upcoming viewing appointments...');
 
             const now = new Date();
+            
+            // 1. Auto-transition Pending -> Scheduled (1h15m before)
+            // Range: [now + 70 mins, now + 80 mins] to ensure it catches bookings around the 75-min mark
+            const seventyFiveMinsStart = new Date(now.getTime() + 70 * 60 * 1000);
+            const seventyFiveMinsEnd = new Date(now.getTime() + 80 * 60 * 1000);
+            
+            const autoScheduled = await Booking.updateMany(
+                {
+                    status: 'pending',
+                    viewTime: { $gte: seventyFiveMinsStart, $lte: seventyFiveMinsEnd }
+                },
+                { status: 'scheduled' }
+            );
+            
+            if (autoScheduled.modifiedCount > 0) {
+                console.log(`✅ Auto-scheduled ${autoScheduled.modifiedCount} pending bookings (1h15m before viewing)`);
+            }
+
+            // 2. Send Reminders (1h before)
             const oneHourLaterStart = new Date(now.getTime() + 55 * 60 * 1000);
             const oneHourLaterEnd = new Date(now.getTime() + 65 * 60 * 1000);
 
@@ -24,7 +43,7 @@ const initCronJobs = () => {
                     $gte: oneHourLaterStart,
                     $lte: oneHourLaterEnd
                 }
-            }).populate('roomId', 'title');
+            }).populate('roomId', 'title images priceMonthly location');
 
             if (upcomingBookings.length === 0) {
                 return;
@@ -36,17 +55,21 @@ const initCronJobs = () => {
             const admins = await User.find({ role: 'admin' }).select('email');
             const adminEmails = admins.map(admin => admin.email);
 
-            if (adminEmails.length === 0) {
-                console.log('⚠️ No admin emails found. Skipping reminders.');
-                return;
-            }
-
             for (const booking of upcomingBookings) {
-                const success = await sendViewingReminderEmail(booking, adminEmails);
-                if (success) {
-                    booking.reminderSent = true;
-                    await booking.save();
+                // 1. Send to Admin (Mandatory)
+                if (adminEmails.length > 0) {
+                    await sendViewingReminderEmail(booking, adminEmails, false);
                 }
+
+                // 2. Send to Guest (if account found by phone)
+                const guestUser = await User.findOne({ phone: booking.phone }).select('email');
+                if (guestUser && guestUser.email) {
+                    await sendViewingReminderEmail(booking, guestUser.email, true);
+                }
+
+                // Mark as sent
+                booking.reminderSent = true;
+                await booking.save();
             }
         } catch (error) {
             console.error('❌ Cron job error:', error);

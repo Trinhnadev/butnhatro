@@ -7,13 +7,27 @@ const webpush = require('web-push');
 // @access Private
 exports.getNotifications = async (req, res, next) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
         const notifications = await Notification.find({ recipient: req.user.id })
             .sort({ createdAt: -1 })
-            .limit(50);
+            .skip(skip)
+            .limit(Number(limit));
 
         const unreadCount = await Notification.countDocuments({ recipient: req.user.id, read: false });
+        const total = await Notification.countDocuments({ recipient: req.user.id });
 
-        res.json({ notifications, unreadCount });
+        res.json({ 
+            notifications, 
+            unreadCount,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         next(error);
     }

@@ -12,7 +12,7 @@ const getIO = (req) => req.app.get('io');
 // @access  Public
 exports.searchBookings = async (req, res, next) => {
     try {
-        const { phone } = req.query;
+        const { phone, page = 1, limit = 10 } = req.query;
 
         if (!phone) {
             return res.status(400).json({
@@ -21,13 +21,23 @@ exports.searchBookings = async (req, res, next) => {
             });
         }
 
+        const skip = (page - 1) * limit;
         const bookings = await Booking.find({ phone })
             .populate('roomId', 'title priceMonthly location images')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit));
+
+        const total = await Booking.countDocuments({ phone });
 
         res.json({
             bookings,
-            count: bookings.length,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
         });
     } catch (error) {
         next(error);
@@ -96,12 +106,16 @@ exports.getBookings = async (req, res, next) => {
     try {
         const {
             page = 1,
-            limit = 20,
+            limit = 10,
             status,
             roomId,
             startDate,
             endDate,
+            viewTimeStart,
+            viewTimeEnd,
             search,
+            sortBy,
+            sortOrder = 'desc',
         } = req.query;
 
         const query = {};
@@ -115,6 +129,12 @@ exports.getBookings = async (req, res, next) => {
             if (endDate) query.createdAt.$lte = new Date(endDate);
         }
 
+        if (viewTimeStart || viewTimeEnd) {
+            query.viewTime = {};
+            if (viewTimeStart) query.viewTime.$gte = new Date(viewTimeStart);
+            if (viewTimeEnd) query.viewTime.$lte = new Date(viewTimeEnd);
+        }
+
         if (search) {
             query.$or = [
                 { phone: { $regex: search, $options: 'i' } },
@@ -124,10 +144,21 @@ exports.getBookings = async (req, res, next) => {
         }
 
         const skip = (page - 1) * limit;
+
+        // Default sort: newest first
+        let sortQuery = { createdAt: -1 };
+        
+        if (sortBy === 'viewTime') {
+            sortQuery = { viewTime: sortOrder === 'asc' ? 1 : -1 };
+        } else if (viewTimeStart || viewTimeEnd) {
+            // Automatically sort by viewTime if we are filtering viewTime
+            sortQuery = { viewTime: 1 };
+        }
+
         const bookings = await Booking.find(query)
             .populate('roomId', 'title priceMonthly location')
             .populate('userId', 'name email')
-            .sort({ createdAt: -1 })
+            .sort(sortQuery)
             .skip(skip)
             .limit(Number(limit));
 
@@ -147,11 +178,26 @@ exports.getBookings = async (req, res, next) => {
 // @access  Private
 exports.getMyBookings = async (req, res, next) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
         const bookings = await Booking.find({ userId: req.user.id })
             .populate('roomId', 'title priceMonthly location images')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit));
 
-        res.json({ bookings });
+        const total = await Booking.countDocuments({ userId: req.user.id });
+
+        res.json({ 
+            bookings,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         next(error);
     }

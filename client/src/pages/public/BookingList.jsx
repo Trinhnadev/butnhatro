@@ -6,6 +6,7 @@ import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import Modal from '../../components/common/Modal';
 import { formatPrice } from '../../utils/helpers';
+import Pagination from '../../components/common/Pagination';
 
 const BookingList = () => {
     const [searchParams] = useSearchParams();
@@ -23,6 +24,13 @@ const BookingList = () => {
     const [cancelingId, setCancelingId] = useState(null);
     const { user } = useAuth();
     const navigate = useNavigate();
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        pages: 1,
+        total: 0,
+        limit: 10
+    });
 
     const [modalState, setModalState] = useState({
         isOpen: false,
@@ -38,13 +46,17 @@ const BookingList = () => {
         if (phone) {
             fetchBookings();
         }
-    }, [phone]);
+    }, [phone, currentPage]);
 
     const fetchBookings = async () => {
         try {
             setLoading(true);
-            const response = await bookingAPI.searchBookings(phone);
+            const response = await bookingAPI.searchBookings(phone, {
+                page: currentPage,
+                limit: 10
+            });
             setBookings(response.data.bookings || []);
+            setPagination(response.data.pagination || { page: 1, pages: 1, total: (response.data.bookings || []).length, limit: 10 });
         } catch (err) {
             console.error(err);
             setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
@@ -281,127 +293,133 @@ const BookingList = () => {
                         <p className="text-gray-500">Không có lịch đặt phòng nào cho số điện thoại này hoặc không khớp với bộ lọc.</p>
                     </div>
                 ) : (
-                    <div className="grid gap-6">
-                        {filteredBookings.map((booking) => (
-                            <div key={booking._id} className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
-                                <div className="p-6">
-                                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-gray-100 pb-4 mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="text-lg font-bold text-gray-900">Mã: {booking.bookingCode}</h3>
-                                                {getStatusBadge(booking.status)}
+                    <>
+                        <div className="grid gap-6">
+                            {filteredBookings.map((booking) => (
+                                <div key={booking._id} className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
+                                    <div className="p-6">
+                                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-gray-100 pb-4 mb-4">
+                                            <div>
+                                                <div className="flex items-center gap-3">
+                                                    <h3 className="text-lg font-bold text-gray-900">Mã: {booking.bookingCode}</h3>
+                                                    {getStatusBadge(booking.status)}
+                                                </div>
+                                                <p className="text-sm text-gray-500 mt-1">Ngày tạo: {new Date(booking.createdAt).toLocaleString('vi-VN')}</p>
                                             </div>
-                                            <p className="text-sm text-gray-500 mt-1">Ngày tạo: {new Date(booking.createdAt).toLocaleString('vi-VN')}</p>
+                                            <div className="text-right">
+                                                <span className="block text-xs text-gray-500 uppercase font-semibold tracking-wider">Lịch hẹn xem phòng</span>
+                                                <span className="text-lg font-bold text-primary">
+                                                    {booking.viewTime ? new Date(booking.viewTime).toLocaleString('vi-VN', {
+                                                        weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                                                    }) : 'Chưa xếp lịch'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="block text-xs text-gray-500 uppercase font-semibold tracking-wider">Lịch hẹn xem phòng</span>
-                                            <span className="text-lg font-bold text-primary">
-                                                {booking.viewTime ? new Date(booking.viewTime).toLocaleString('vi-VN', {
-                                                    weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-                                                }) : 'Chưa xếp lịch'}
-                                            </span>
-                                        </div>
-                                    </div>
 
-                                    <div className="flex flex-col md:flex-row gap-6">
-                                        {/* Room Info */}
-                                        <div className="flex-1">
-                                            <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Thông tin phòng</h4>
-                                            {booking.roomId ? (
-                                                <div className="flex gap-4">
-                                                    {booking.roomId.images && booking.roomId.images[0] && (
-                                                        <img
-                                                            src={booking.roomId.images[0].url || booking.roomId.images[0]}
-                                                            alt={booking.roomId.title}
-                                                            className="w-20 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0"
-                                                            onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/100?text=No+Image'; }}
-                                                        />
-                                                    )}
-                                                    <div>
-                                                        <Link to={`/rooms/${booking.roomId._id}`} className="font-medium text-gray-900 hover:text-primary transition-colors line-clamp-1">
-                                                            {booking.roomId.title}
-                                                        </Link>
-                                                        <p className="text-primary font-bold mt-1 text-sm">{booking.roomId.priceMonthly} Triệu/tháng</p>
-                                                        <p className="text-gray-500 text-xs mt-1">
-                                                            📍 {booking.roomId.location.streetAddress}, {booking.roomId.location.street}, {booking.roomId.location.city}
-                                                        </p>
-                                                        <a
-                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                                                `${booking.roomId.location.streetAddress}, ${booking.roomId.location.street}, ${booking.roomId.location.city}`
-                                                            )}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium mt-2 hover:underline"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            </svg>
-                                                            Xem bản đồ
-                                                        </a>
+                                        <div className="flex flex-col md:flex-row gap-6">
+                                            {/* Room Info */}
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Thông tin phòng</h4>
+                                                {booking.roomId ? (
+                                                    <div className="flex gap-4">
+                                                        {booking.roomId.images && booking.roomId.images[0] && (
+                                                            <img
+                                                                src={booking.roomId.images[0].url || booking.roomId.images[0]}
+                                                                alt={booking.roomId.title}
+                                                                className="w-20 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                                                                onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/100?text=No+Image'; }}
+                                                            />
+                                                        )}
+                                                        <div>
+                                                            <Link to={`/rooms/${booking.roomId._id}`} className="font-medium text-gray-900 hover:text-primary transition-colors line-clamp-1">
+                                                                {booking.roomId.title}
+                                                            </Link>
+                                                            <p className="text-primary font-bold mt-1 text-sm">{booking.roomId.priceMonthly} Triệu/tháng</p>
+                                                            <p className="text-gray-500 text-xs mt-1">
+                                                                📍 {booking.roomId.location.streetAddress}, {booking.roomId.location.street}, {booking.roomId.location.city}
+                                                            </p>
+                                                            <a
+                                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                                                    `${booking.roomId.location.streetAddress}, ${booking.roomId.location.street}, ${booking.roomId.location.city}`
+                                                                )}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium mt-2 hover:underline"
+                                                            >
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                </svg>
+                                                                Xem bản đồ
+                                                            </a>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <p className="text-red-500 italic">Phòng này không còn tồn tại</p>
-                                            )}
-                                        </div>
-
-                                        {/* Booking Details */}
-                                        <div className="flex-1 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6">
-                                            <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Chi tiết yêu cầu</h4>
-                                            <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                                <span className="text-gray-500">Khách hàng:</span>
-                                                <span className="font-medium">{booking.customerName}</span>
-
-                                                <span className="text-gray-500">Số người:</span>
-                                                <span className="font-medium">{booking.peopleCount}</span>
-
-                                                <span className="text-gray-500">Dự kiến vào:</span>
-                                                <span className="font-medium">{new Date(booking.moveInDate).toLocaleDateString('vi-VN')}</span>
-
-                                                <span className="text-gray-500">Ngân sách:</span>
-                                                <span className="font-medium">{booking.budgetMax ? `${booking.budgetMax} Triệu` : '-'}</span>
-                                            </div>
-                                            {booking.notes && (
-                                                <div className="mt-3 bg-gray-50 p-3 rounded-lg text-sm text-gray-600 italic">
-                                                    "{booking.notes}"
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Cancel Button */}
-                                    {canCancel(booking) && (
-                                        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-                                            <button
-                                                onClick={() => handleCancelClick(booking)}
-                                                disabled={cancelingId === booking._id}
-                                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {cancelingId === booking._id ? (
-                                                    <>
-                                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-                                                        </svg>
-                                                        Đang hủy...
-                                                    </>
                                                 ) : (
-                                                    <>
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                        Hủy lịch hẹn
-                                                    </>
+                                                    <p className="text-red-500 italic">Phòng này không còn tồn tại</p>
                                                 )}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                                            </div>
 
-                        ))}
-                    </div>
+                                            {/* Booking Details */}
+                                            <div className="flex-1 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6">
+                                                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Chi tiết yêu cầu</h4>
+                                                <div className="grid grid-cols-2 gap-y-2 text-sm">
+                                                    <span className="text-gray-500">Khách hàng:</span>
+                                                    <span className="font-medium">{booking.customerName}</span>
+
+                                                    <span className="text-gray-500">Số người:</span>
+                                                    <span className="font-medium">{booking.peopleCount}</span>
+
+                                                    <span className="text-gray-500">Dự kiến vào:</span>
+                                                    <span className="font-medium">{new Date(booking.moveInDate).toLocaleDateString('vi-VN')}</span>
+
+                                                    <span className="text-gray-500">Ngân sách:</span>
+                                                    <span className="font-medium">{booking.budgetMax ? `${booking.budgetMax} Triệu` : '-'}</span>
+                                                </div>
+                                                {booking.notes && (
+                                                    <div className="mt-3 bg-gray-50 p-3 rounded-lg text-sm text-gray-600 italic">
+                                                        "{booking.notes}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Cancel Button */}
+                                        {canCancel(booking) && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                                                <button
+                                                    onClick={() => handleCancelClick(booking)}
+                                                    disabled={cancelingId === booking._id}
+                                                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {cancelingId === booking._id ? (
+                                                        <>
+                                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                                                            </svg>
+                                                            Đang hủy...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                            Hủy lịch hẹn
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Pagination
+                            pagination={pagination}
+                            onPageChange={(page) => setCurrentPage(page)}
+                        />
+                    </>
                 )}
             </div>
 
